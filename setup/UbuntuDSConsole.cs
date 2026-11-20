@@ -22,6 +22,9 @@ using System.Windows.Threading;
 using IoPath = System.IO.Path;
 using SPath = System.Windows.Shapes.Path;
 
+[assembly: System.Reflection.AssemblyVersion("1.0.1.0")]
+[assembly: System.Reflection.AssemblyFileVersion("1.0.1.0")]
+
 namespace UbuntuDSConsole
 {
     public static class Program
@@ -297,7 +300,8 @@ namespace UbuntuDSConsole
             var miAbout = new MenuItem { Header = "关于 Ubuntu-DS 控制台(_A)" };
             miAbout.Click += delegate
             {
-                MessageBox.Show(this, "Ubuntu / WSL2\nGNOME 远程桌面：" + RdpHost + ":" + RdpPort
+                MessageBox.Show(this, "WSL-Ubuntu " + typeof(MainWindow).Assembly.GetName().Version.ToString(3)
+                    + "\nUbuntu / WSL2\nGNOME 远程桌面：" + RdpHost + ":" + RdpPort
                     + "\n\n支持 RDP 剪贴板和桌面自动重连。关闭控制台会关闭 Ubuntu-DS。",
                     "关于 Ubuntu-DS 控制台", MessageBoxButton.OK, MessageBoxImage.Information);
             };

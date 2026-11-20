@@ -11,10 +11,10 @@
 ## 生成 Windows 下载包
 
 ```powershell
-powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\setup\package-windows.ps1 -Version 0.1.0-preview.1 -OutputDirectory .\dist
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\setup\package-windows.ps1 -Version 1.0.1 -OutputDirectory .\dist
 ```
 
-打包脚本会重新编译控制台，并生成 `WSL-Ubuntu-0.1.0-preview.1-windows.zip` 和对应的 `.zip.sha256`。包内包含控制台、RDP 模板和安装脚本。Windows 和 Ubuntu 的安装步骤见[安装指南](docs/installation.md)。
+打包脚本会重新编译控制台，并生成 `WSL-Ubuntu-1.0.1-windows.zip` 和对应的 `.zip.sha256`。包内包含控制台、RDP 模板和安装脚本。Windows 和 Ubuntu 的安装步骤见[安装指南](docs/installation.md)。
 
 ## 发布验收
 

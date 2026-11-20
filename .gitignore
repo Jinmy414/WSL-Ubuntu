@@ -1,6 +1,7 @@
 # Virtual disks, exports, and local backups
 /backups/
 /distro/
+/dist/
 *.vhd
 *.vhdx
 *.vmdk

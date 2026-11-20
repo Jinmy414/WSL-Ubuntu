@@ -288,6 +288,9 @@ namespace UbuntuDSConsole
             mView.Items.Add(miFull);
 
             var mHelp = new MenuItem { Header = "帮助(_H)" };
+            var miDoctor = new MenuItem { Header = "运行连接诊断(_D)" };
+            miDoctor.Click += delegate { OpenConnectionDoctor(); };
+            mHelp.Items.Add(miDoctor);
             var miLog = new MenuItem { Header = "查看连接日志(_L)" };
             miLog.Click += delegate { OpenConnectionLog(); };
             mHelp.Items.Add(miLog);
@@ -302,6 +305,18 @@ namespace UbuntuDSConsole
 
             menu.Items.Add(mFile); menu.Items.Add(mVm); menu.Items.Add(mView); menu.Items.Add(mHelp);
             return menu;
+        }
+
+        void OpenConnectionDoctor()
+        {
+            try
+            {
+                Process.Start(new ProcessStartInfo(IoPath.Combine(BinDir, "ds-doctor.cmd")) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(this, ex.Message, "无法运行连接诊断", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
         }
 
         void OpenConnectionLog()
@@ -800,9 +815,12 @@ namespace UbuntuDSConsole
 
         static bool RequestKeepAlive(Func<bool> cancelled)
         {
-            RunConnectionCommand("Enable keep-alive", "schtasks.exe", "/Change /TN UbuntuDS-KeepAlive /ENABLE", 5000, cancelled);
-            RunConnectionCommand("Request keep-alive", "schtasks.exe", "/Run /TN UbuntuDS-KeepAlive", 5000, cancelled);
-            return !cancelled();
+            int? enabled = RunConnectionCommand("Enable keep-alive", "schtasks.exe",
+                "/Change /TN UbuntuDS-KeepAlive /ENABLE", 5000, cancelled);
+            if (enabled != 0) return false;
+            int? started = RunConnectionCommand("Request keep-alive", "schtasks.exe",
+                "/Run /TN UbuntuDS-KeepAlive", 5000, cancelled);
+            return started == 0 && !cancelled();
         }
 
         bool keepAliveRequested;

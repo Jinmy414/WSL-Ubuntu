@@ -1,0 +1,19 @@
+name: 功能建议
+description: 建议改进桌面控制台、安装流程或项目文档
+title: "[建议] "
+labels: [enhancement]
+body:
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 使用场景
+      description: 你希望完成什么任务？目前遇到了哪些困难？
+    validations:
+      required: true
+  - type: textarea
+    id: behavior
+    attributes:
+      label: 建议的行为
+      description: 说明理想的操作流程和可观察到的结果。
+    validations:
+      required: true

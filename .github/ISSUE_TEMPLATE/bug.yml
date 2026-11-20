@@ -1,0 +1,49 @@
+name: 缺陷报告
+description: 报告安装、启动、连接或操作异常
+title: "[缺陷] "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        请先搜索已有议题。议题会公开，请删去账号、凭据、证书私钥、个人路径及敏感网络信息。
+        安全漏洞请按仓库的 SECURITY.md 私下报告。
+  - type: dropdown
+    id: area
+    attributes:
+      label: 问题发生在哪个环节
+      options:
+        - 环境检查或安装
+        - 启动、RDP 登录或重连
+        - Windows 代理同步
+        - 控制台操作
+        - 其他
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: 运行环境
+      description: 请注明 Windows、WSL、Ubuntu 版本及项目的提交或版本。网络相关问题可注明 WSL 网络模式与代理开启状态。
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: 复现步骤
+      description: 从哪一步开始操作，执行了什么命令或点击了哪个按钮？
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: 预期与实际结果
+      description: 请描述期待的结果和实际表现，并注明是否每次都发生。
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: 已脱敏的诊断摘要
+      description: 可提供 bin/ds-doctor.cmd 的相关输出或连接日志中的短片段。
+      render: text

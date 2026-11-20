@@ -1,6 +1,6 @@
-# Ubuntu-DS
+# WSL-Ubuntu
 
-Ubuntu-DS 是一个 Windows 上的 WSL 2 桌面控制台。它在 Ubuntu 中启动独立的 GNOME 会话，确认远程桌面服务就绪后，将 Windows 远程桌面嵌入控制台。控制台支持全屏、自动重连、打开 Ubuntu 终端和关机。
+WSL-Ubuntu 是一个 Windows 上的 WSL 2 桌面控制台。它在名为 `Ubuntu-DS` 的 WSL 发行版中启动独立的 GNOME 会话，确认远程桌面服务就绪后，将 Windows 远程桌面嵌入控制台。控制台支持全屏、自动重连、打开 Ubuntu 终端和关机。
 
 仓库提供控制台源码和初始化脚本。每次安装使用自己的 Ubuntu 用户、RDP 登录和本地生成的 TLS 证书。
 

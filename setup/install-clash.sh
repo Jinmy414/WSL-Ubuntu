@@ -45,7 +45,13 @@ done
 
 setup_dir=$(dirname -- "$(realpath -- "$0")")
 with_windows_proxy=(python3 "$setup_dir/ds-proxy-watch" --exec-windows)
-sudo_for_apt=(sudo --preserve-env=http_proxy,https_proxy,no_proxy)
+apt_via_windows() {
+  if "${with_windows_proxy[@]}" sudo --preserve-env=http_proxy,https_proxy,no_proxy apt-get "$@"; then
+    return 0
+  fi
+  echo 'APT through the Windows proxy failed. Retrying with a direct connection.' >&2
+  sudo apt-get -o Acquire::http::Proxy=DIRECT -o Acquire::https::Proxy=DIRECT "$@"
+}
 asset="Clash.Verge_${version}_${arch}.deb"
 base='https://github.com/clash-verge-rev/clash-verge-rev/releases/download'
 temp_dir=$(mktemp -d)
@@ -77,6 +83,6 @@ printf '%s  %s\n' "$sha256" "$deb" | sha256sum --check --status || {
 # APT's download user needs read access to this public package.
 chmod 755 "$temp_dir"
 chmod 644 "$deb"
-"${with_windows_proxy[@]}" "${sudo_for_apt[@]}" apt-get update
-"${with_windows_proxy[@]}" "${sudo_for_apt[@]}" apt-get install --yes --no-install-recommends "$deb"
+apt_via_windows update
+apt_via_windows install --yes --no-install-recommends "$deb"
 echo 'Clash Verge Rev is installed. Open it from the Ubuntu application menu to configure your proxy.'

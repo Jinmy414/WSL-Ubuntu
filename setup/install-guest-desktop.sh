@@ -106,8 +106,12 @@ fi
 echo '[2/4] Install GNOME, Remote Desktop and the local relay'
 apt_via_windows() {
   # Bootstrap package downloads before the guest Clash application is configured.
-  python3 "$setup_dir/ds-proxy-watch" --exec-windows \
-    sudo --preserve-env=http_proxy,https_proxy,no_proxy apt-get "$@"
+  if python3 "$setup_dir/ds-proxy-watch" --exec-windows \
+      sudo --preserve-env=http_proxy,https_proxy,no_proxy apt-get "$@"; then
+    return 0
+  fi
+  echo 'APT through the Windows proxy failed. Retrying with a direct connection.' >&2
+  sudo apt-get -o Acquire::http::Proxy=DIRECT -o Acquire::https::Proxy=DIRECT "$@"
 }
 apt_via_windows update
 apt_via_windows install --yes --no-install-recommends ubuntu-session gnome-remote-desktop \

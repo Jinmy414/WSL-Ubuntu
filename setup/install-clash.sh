@@ -53,9 +53,22 @@ deb="$temp_dir/$asset"
 trap 'rm -f -- "$deb"; rmdir -- "$temp_dir"' EXIT
 
 printf 'Downloading official Clash Verge Rev v%s for %s...\n' "$version" "$arch"
-"${with_windows_proxy[@]}" curl -q --fail --location --silent --show-error \
-  --proto '=https' --proto-redir '=https' --retry 2 --connect-timeout 15 --max-time 180 \
-  --output "$deb" "$base/v$version/$asset"
+downloaded=false
+for attempt in 1 2 3; do
+  if "${with_windows_proxy[@]}" curl -q --fail --location --silent --show-error \
+      --proto '=https' --proto-redir '=https' --continue-at - --connect-timeout 15 --max-time 180 \
+      --output "$deb" "$base/v$version/$asset"; then
+    downloaded=true
+    break
+  fi
+  if (( attempt < 3 )); then
+    echo 'Download interrupted; retrying from the last received byte.' >&2
+  fi
+done
+if ! $downloaded; then
+  echo 'The upstream download did not complete. Retry with a working Windows proxy or direct connection.' >&2
+  exit 1
+fi
 printf '%s  %s\n' "$sha256" "$deb" | sha256sum --check --status || {
   echo 'Clash Verge Rev download failed SHA-256 verification.' >&2
   exit 1

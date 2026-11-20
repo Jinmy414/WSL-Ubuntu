@@ -1,0 +1,8 @@
+* text=auto
+*.sh text eol=lf
+*.cmd text eol=crlf
+*.rdp text eol=crlf
+*.service text eol=lf
+setup/ds-headless-shell text eol=lf
+setup/ds-proxy-watch text eol=lf
+setup/ds-proxy-bash text eol=lf

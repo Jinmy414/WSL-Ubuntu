@@ -1,0 +1,184 @@
+#!/usr/bin/env python3
+"""Follow the Windows user's manual HTTP(S) proxy without restarting WSL."""
+
+import json
+import os
+from pathlib import Path
+import re
+import shlex
+import shutil
+import socket
+import subprocess
+import sys
+import tempfile
+import time
+from urllib.parse import urlsplit
+
+
+WINDOWS_SETTINGS = r"HKCU\Software\Microsoft\Windows\CurrentVersion\Internet Settings"
+REG_EXE = (os.environ.get("DS_REG_EXE") or shutil.which("reg.exe")
+           or "/mnt/c/Windows/System32/reg.exe")
+RUNTIME_DIR = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"))
+ENV_FILE = RUNTIME_DIR / "ubuntu-ds-proxy.env"
+LOCAL_BYPASS = ("localhost", "127.0.0.0/8", "::1", "10.0.0.0/8",
+                "172.16.0.0/12", "192.168.0.0/16", "*.local")
+PROBE_REQUEST = (b"CONNECT www.microsoft.com:443 HTTP/1.1\r\n"
+                 b"Host: www.microsoft.com:443\r\n\r\n")
+PROXY_KEYS = ("http_proxy", "https_proxy", "HTTP_PROXY", "HTTPS_PROXY",
+              "no_proxy", "NO_PROXY", "all_proxy", "ALL_PROXY")
+
+
+def parse_settings(output):
+    settings = dict(re.findall(r"^\s*(\w+)[ \t]+REG_\w+[ \t]+(.*)$", output, re.M))
+    if settings.get("ProxyEnable", "0x0").strip() != "0x1":
+        return {}, LOCAL_BYPASS
+
+    bypass = list(LOCAL_BYPASS)
+    for entry in settings.get("ProxyOverride", "").lower().split(";"):
+        entry = entry.strip()
+        if re.fullmatch(r"\*?\.?[a-z0-9][a-z0-9.-]*", entry):
+            if entry.startswith("*"):
+                entry = "*." + entry[1:].lstrip(".")
+            if entry not in bypass:
+                bypass.append(entry)
+
+    server = settings.get("ProxyServer", "").strip()
+    if "=" in server:
+        proxies = dict(part.split("=", 1) for part in server.split(";") if "=" in part)
+        proxies = {name.strip().lower(): value.strip() for name, value in proxies.items()}
+    else:
+        proxies = {"http": server, "https": server}
+
+    endpoints = {}
+    for scheme in ("http", "https"):
+        value = proxies.get(scheme)
+        if not value:
+            continue
+        try:
+            url = urlsplit(value if "://" in value else "http://" + value)
+            if (url.scheme == "http" and url.hostname and not url.username
+                    and not url.password and not url.path and not url.query and not url.fragment):
+                endpoints[scheme] = (url.hostname, url.port or 80)
+        except ValueError:
+            continue
+    return endpoints, tuple(bypass)
+
+
+def windows_settings():
+    output = subprocess.check_output([REG_EXE, "query", WINDOWS_SETTINGS],
+                                     text=True, errors="replace",
+                                     stderr=subprocess.DEVNULL, timeout=3)
+    return parse_settings(output)
+
+
+def reachable(endpoint):
+    try:
+        with socket.create_connection(endpoint, timeout=1.5) as connection:
+            connection.sendall(PROBE_REQUEST)
+            with connection.makefile("rb") as response:
+                return re.match(rb"HTTP/1\.[01] 2\d\d(?: |\r?$)", response.readline(256)) is not None
+    except OSError:
+        return False
+
+
+def active_proxy():
+    configured, bypass = windows_settings()
+    availability = {endpoint: reachable(endpoint) for endpoint in set(configured.values())}
+    active = {scheme: endpoint for scheme, endpoint in configured.items()
+              if availability[endpoint]}
+    return active, bypass, bool(configured)
+
+
+def proxy_env(endpoints, bypass):
+    env = {}
+    for scheme, (host, port) in endpoints.items():
+        address = f"[{host}]" if ":" in host else host
+        key = scheme + "_proxy"
+        env[key] = env[key.upper()] = f"http://{address}:{port}"
+    if endpoints:
+        bypass_list = ",".join(host.removeprefix("*") for host in bypass)
+        env["no_proxy"] = env["NO_PROXY"] = bypass_list
+    return env
+
+
+def exec_with_proxy(command):
+    if not command:
+        print("Usage: ds-proxy-watch --exec COMMAND [ARGUMENTS...]", file=sys.stderr)
+        return 2
+    env = os.environ.copy()
+    try:
+        endpoints, bypass, _ = active_proxy()
+    except (OSError, subprocess.SubprocessError) as error:
+        print(f"Unable to read Windows proxy settings: {error}", file=sys.stderr)
+    else:
+        for key in PROXY_KEYS:
+            env.pop(key, None)
+        env.update(proxy_env(endpoints, bypass))
+    # Wrap regular and root commands without sourcing a file owned by another user.
+    try:
+        os.execvpe(command[0], command, env)
+    except OSError as error:
+        print(f"{command[0]}: {error.strerror}", file=sys.stderr)
+        return 127 if isinstance(error, FileNotFoundError) else 126
+
+
+def write_environment(env):
+    # Use a user-owned runtime directory and publish only a complete file.
+    with tempfile.NamedTemporaryFile(mode="w", dir=RUNTIME_DIR, delete=False) as file:
+        for key, value in env.items():
+            file.write(f"export {key}={shlex.quote(value)}\n")
+    os.replace(file.name, ENV_FILE)
+
+
+def run(*args):
+    subprocess.run(args, stdout=subprocess.DEVNULL, check=True, timeout=3)
+
+
+def apply(endpoints, bypass):
+    env = proxy_env(endpoints, bypass)
+    write_environment(env)
+    # D-Bus supports replacement only. Empty values remove a stale proxy for fresh apps.
+    run("dbus-update-activation-environment", "--systemd",
+        *(f"{key}={env.get(key, '')}" for key in PROXY_KEYS))
+
+    schema = "org.gnome.system.proxy"
+    if not shutil.which("gsettings"):
+        return
+    schemas = subprocess.check_output(["gsettings", "list-schemas"], text=True, timeout=3)
+    if schema not in schemas.splitlines():
+        return
+    for scheme in ("http", "https"):
+        host, port = endpoints.get(scheme, ("", 0))
+        run("gsettings", "set", f"{schema}.{scheme}", "host", json.dumps(host))
+        run("gsettings", "set", f"{schema}.{scheme}", "port", str(port))
+    run("gsettings", "set", schema, "ignore-hosts", json.dumps(bypass))
+    run("gsettings", "set", schema, "mode", "manual" if endpoints else "none")
+
+
+def main():
+    state = None
+    failed = False
+    while True:
+        try:
+            active, bypass, configured = active_proxy()
+            current = active, bypass
+            if state != current:
+                apply(*current)
+                state = current
+                if active:
+                    print("Windows HTTP(S) proxy:", active, flush=True)
+                else:
+                    detail = "configured proxy unavailable" if configured else "manual proxy disabled"
+                    print(f"Direct via Windows network ({detail})", flush=True)
+            failed = False
+        except (OSError, subprocess.SubprocessError) as error:
+            if not failed:
+                print(f"Unable to update Windows proxy: {error}", flush=True)
+            failed = True
+        time.sleep(5)
+
+
+if __name__ == "__main__":
+    if len(sys.argv) > 1 and sys.argv[1] == "--exec":
+        sys.exit(exec_with_proxy(sys.argv[2:]))
+    main()

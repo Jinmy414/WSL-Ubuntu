@@ -1,0 +1,41 @@
+# Virtual disks, exports, and local backups
+/backups/
+/distro/
+*.vhd
+*.vhdx
+*.vmdk
+*.ova
+*.ovf
+*.iso
+*.bak
+*.tar
+*.tar.*
+*.zip
+
+# Build outputs, recordings, and workstation diagnostics
+*.exe
+*.dll
+*.pdb
+*.log
+*.dmp
+*.png
+*.jpg
+*.jpeg
+*.bmp
+*.lnk
+__pycache__/
+*.pyc
+
+# Local credentials, configuration, and certificates
+.env
+.env.*
+.wslconfig
+*.local
+*.local.*
+*.pem
+*.key
+*.crt
+*.cer
+*.pfx
+*.rdg
+/bin/ds-user.txt

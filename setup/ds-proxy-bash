@@ -1,0 +1,13 @@
+# Loaded by the Ubuntu-DS user's .bashrc. A new prompt picks up host changes.
+ds_load_windows_proxy() {
+  local env_file="${XDG_RUNTIME_DIR:-/run/user/$UID}/ubuntu-ds-proxy.env"
+  [[ -r "$env_file" ]] || return 0
+  unset http_proxy https_proxy HTTP_PROXY HTTPS_PROXY all_proxy ALL_PROXY no_proxy NO_PROXY
+  . "$env_file"
+}
+
+ds_load_windows_proxy
+case "; ${PROMPT_COMMAND[*]-}; " in
+  *'; ds_load_windows_proxy; '*) ;;
+  *) PROMPT_COMMAND+=(ds_load_windows_proxy) ;;
+esac

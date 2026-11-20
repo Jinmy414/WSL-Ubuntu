@@ -1,0 +1,41 @@
+#!/bin/bash
+set -eu
+
+export XDG_CURRENT_DESKTOP=ubuntu:GNOME
+export XDG_SESSION_DESKTOP=ubuntu DESKTOP_SESSION=ubuntu GNOME_SHELL_SESSION_MODE=ubuntu
+export XDG_SESSION_CLASS=user XDG_SESSION_TYPE=wayland
+export XDG_RUNTIME_DIR="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
+export GALLIUM_DRIVER=llvmpipe LIBGL_ALWAYS_SOFTWARE=1 GSK_RENDERER=cairo
+
+# Track this session's compositor socket separately from any WSLg socket.
+shopt -s nullglob
+declare -A existing_sockets=()
+for path in "$XDG_RUNTIME_DIR"/wayland-*; do
+  if [[ -S "$path" ]]; then existing_sockets["$path"]=1; fi
+done
+
+unset WAYLAND_DISPLAY
+/usr/bin/gnome-shell --headless &
+shell_pid=$!
+trap 'kill "$shell_pid" 2>/dev/null || true' EXIT
+trap 'exit 0' TERM INT
+
+for ((second = 0; second < 60; second++)); do
+  if ! kill -0 "$shell_pid" 2>/dev/null; then
+    echo 'The headless GNOME Shell exited during startup.' >&2
+    exit 1
+  fi
+  for path in "$XDG_RUNTIME_DIR"/wayland-*; do
+    if [[ ! -S "$path" || ${existing_sockets["$path"]+present} ]]; then continue; fi
+    export WAYLAND_DISPLAY="${path##*/}"
+    dbus-update-activation-environment --systemd \
+      WAYLAND_DISPLAY XDG_CURRENT_DESKTOP XDG_SESSION_DESKTOP DESKTOP_SESSION \
+      XDG_SESSION_TYPE GNOME_SHELL_SESSION_MODE GALLIUM_DRIVER LIBGL_ALWAYS_SOFTWARE GSK_RENDERER
+    wait "$shell_pid"
+    exit 0
+  done
+  sleep 1
+done
+
+echo 'GNOME did not create a Wayland socket within 60 seconds.' >&2
+exit 1

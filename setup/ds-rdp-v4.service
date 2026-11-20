@@ -1,0 +1,13 @@
+[Unit]
+Description=Ubuntu-DS local IPv4 RDP relay
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/socat TCP4-LISTEN:3393,bind=127.0.0.1,reuseaddr,fork TCP6:[::1]:3391
+DynamicUser=yes
+NoNewPrivileges=yes
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=multi-user.target

@@ -9,8 +9,9 @@ import socket
 import subprocess
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 
 WATCHER = Path(__file__).resolve().parents[1] / "setup" / "ds-proxy-watch"
@@ -198,6 +199,45 @@ class ProxyCommandTests(unittest.TestCase):
         self.assertEqual(args, ["argument with spaces", ""])
         self.assertEqual(env["HTTP_PROXY"], f"http://127.0.0.1:{port}")
         self.assertEqual(env["HTTPS_PROXY"], env["HTTP_PROXY"])
+
+
+class GnomeProxyTests(unittest.TestCase):
+    def test_watcher_repairs_external_mode_change_without_reapplying_environment(self):
+        schema = "org.gnome.system.proxy"
+        bypass = ("localhost", "127.0.0.0/8")
+        endpoints = dict.fromkeys(("http", "https"), ("127.0.0.1", 7897))
+
+        def snapshot(mode):
+            return (f"{schema} mode '{mode}'\n"
+                    f"{schema} ignore-hosts {list(bypass)!r}\n"
+                    f"{schema}.http host '127.0.0.1'\n"
+                    f"{schema}.http port 7897\n"
+                    f"{schema}.https host '127.0.0.1'\n"
+                    f"{schema}.https port 7897\n")
+
+        read_settings = Mock(side_effect=(schema + "\n", snapshot("manual"),
+                                          snapshot("none"), snapshot("manual")))
+        write_settings = Mock()
+        write_environment = Mock()
+        sleep = Mock(side_effect=(None, None, StopIteration))
+        with patch.dict(WATCHER_GLOBALS, {
+            "active_proxy": lambda preference: (endpoints, bypass, True),
+            "read_proxy_mode": lambda: ("clash", 7897),
+            "run": write_settings,
+            "time": SimpleNamespace(sleep=sleep),
+            "write_environment": write_environment,
+        }), patch.object(WATCHER_GLOBALS["shutil"], "which", return_value="/usr/bin/gsettings"), \
+                patch.object(subprocess, "check_output", read_settings):
+            with self.assertRaises(StopIteration):
+                WATCHER_FUNCTIONS["main"]()
+
+        self.assertEqual(read_settings.call_args_list, [
+            call(["gsettings", "list-schemas"], text=True, timeout=3),
+            *[call(["gsettings", "list-recursively", schema], text=True, timeout=3)] * 3,
+        ])
+        self.assertEqual([entry for entry in write_settings.call_args_list if entry.args[0] == "gsettings"],
+                         [call("gsettings", "set", schema, "mode", '"manual"')])
+        write_environment.assert_called_once()
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-"""Exercise the proxy wrapper with a fake registry and a loopback server."""
+"""Exercise the proxy wrapper with isolated config and loopback sockets."""
 
 from concurrent.futures import ThreadPoolExecutor
 import json
@@ -10,12 +10,24 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest.mock import Mock, patch
 
 
 WATCHER = Path(__file__).resolve().parents[1] / "setup" / "ds-proxy-watch"
-PARSE_SETTINGS = runpy.run_path(str(WATCHER))["parse_settings"]
+WATCHER_FUNCTIONS = runpy.run_path(str(WATCHER))
+PARSE_SETTINGS = WATCHER_FUNCTIONS["parse_settings"]
+WATCHER_GLOBALS = PARSE_SETTINGS.__globals__
 PROXY_VARS = ("http_proxy", "HTTP_PROXY", "https_proxy", "HTTPS_PROXY",
               "no_proxy", "NO_PROXY", "all_proxy", "ALL_PROXY")
+WRAPPER_SCRIPT = """
+from pathlib import Path
+import runpy
+import sys
+
+wrapper = runpy.run_path(sys.argv[1])["exec_with_proxy"]
+wrapper.__globals__["PROXY_MODE_FILE"] = Path(sys.argv[2])
+sys.exit(wrapper(sys.argv[3:]))
+"""
 CHILD_SCRIPT = """
 import json
 import os
@@ -32,17 +44,19 @@ def registry_settings(enabled, endpoints, bypass=""):
             f"    ProxyOverride    REG_SZ    {bypass}\n")
 
 
-def run_wrapped_command(settings):
+def run_wrapped_command(settings, mode="windows"):
     with tempfile.TemporaryDirectory() as temp_dir:
         registry = Path(temp_dir) / "fake-registry"
         registry.write_text(f"#!/bin/sh\ncat <<'REGISTRY'\n{settings}REGISTRY\n", encoding="utf-8")
         registry.chmod(0o700)
+        config = Path(temp_dir) / "proxy-mode"
+        config.write_text(mode + "\n", encoding="utf-8")
         env = os.environ.copy()
         env.update(dict.fromkeys(PROXY_VARS, "http://stale.invalid:8080"))
         env["DS_REG_EXE"] = str(registry)
         env["XDG_RUNTIME_DIR"] = temp_dir
         result = subprocess.run(
-            [sys.executable, str(WATCHER), "--exec", sys.executable, "-c", CHILD_SCRIPT,
+            [sys.executable, "-c", WRAPPER_SCRIPT, str(WATCHER), str(config), sys.executable, "-c", CHILD_SCRIPT,
              ",".join(PROXY_VARS), "argument with spaces", ""],
             env=env, capture_output=True, text=True, check=True, timeout=8,
         )
@@ -77,6 +91,66 @@ class RegistrySettingsTests(unittest.TestCase):
                 self.assertEqual(endpoints, {})
 
 
+class ProxyModeTests(unittest.TestCase):
+    def test_missing_config_selects_builtin_clash(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config = Path(temp_dir) / "proxy-mode"
+            with patch.dict(WATCHER_GLOBALS, {"PROXY_MODE_FILE": config}):
+                self.assertEqual(WATCHER_FUNCTIONS["read_proxy_mode"](), ("clash", 7897))
+
+    def test_explicit_windows_and_clash_modes(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config = Path(temp_dir) / "proxy-mode"
+            with patch.dict(WATCHER_GLOBALS, {"PROXY_MODE_FILE": config}):
+                for mode, expected in (("windows", ("windows", None)), ("clash 8118", ("clash", 8118))):
+                    with self.subTest(mode=mode):
+                        config.write_text(mode + "\n", encoding="utf-8")
+                        self.assertEqual(WATCHER_FUNCTIONS["read_proxy_mode"](), expected)
+
+    def test_invalid_mode_or_clash_port_raises(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            config = Path(temp_dir) / "proxy-mode"
+            with patch.dict(WATCHER_GLOBALS, {"PROXY_MODE_FILE": config}):
+                for mode in ("unknown", "clash invalid", "clash 0", "clash 65536"):
+                    with self.subTest(mode=mode):
+                        config.write_text(mode + "\n", encoding="utf-8")
+                        with self.assertRaises(ValueError):
+                            WATCHER_FUNCTIONS["read_proxy_mode"]()
+
+    def test_clash_checks_guest_listener_before_probing(self):
+        port = 8118
+        endpoint = ("127.0.0.1", port)
+        for has_listener, connects in ((False, False), (True, False), (True, True)):
+            guest_listener = Mock(return_value=has_listener)
+            reachable = Mock(return_value=connects)
+            windows_settings = Mock()
+            with self.subTest(has_listener=has_listener, connects=connects), patch.dict(WATCHER_GLOBALS, {
+                "read_proxy_mode": lambda: ("clash", port),
+                "guest_listener": guest_listener,
+                "reachable": reachable,
+                "windows_settings": windows_settings,
+            }):
+                active, _, configured = WATCHER_FUNCTIONS["active_proxy"]()
+                expected = {"http": endpoint, "https": endpoint} if connects else {}
+                self.assertEqual(active, expected)
+                self.assertTrue(configured)
+                guest_listener.assert_called_once_with(port)
+                if has_listener:
+                    reachable.assert_called_once_with(endpoint)
+                else:
+                    reachable.assert_not_called()
+                windows_settings.assert_not_called()
+
+    def test_guest_listener_requires_an_active_tcp_listener(self):
+        with socket.socket() as listener:
+            listener.bind(("127.0.0.1", 0))
+            port = listener.getsockname()[1]
+            guest_listener = WATCHER_FUNCTIONS["guest_listener"]
+            self.assertFalse(guest_listener(port))
+            listener.listen()
+            self.assertTrue(guest_listener(port))
+
+
 class ProxyCommandTests(unittest.TestCase):
     def test_disabled_system_proxy_clears_inherited_settings(self):
         args, env = run_wrapped_command(registry_settings(False, "127.0.0.1:8888"))
@@ -109,6 +183,21 @@ class ProxyCommandTests(unittest.TestCase):
                 self.assertEqual(env["NO_PROXY"], env["no_proxy"])
                 self.assertNotIn("ALL_PROXY", env)
                 self.assertNotIn("all_proxy", env)
+
+    def test_builtin_clash_passes_its_guest_proxy_to_the_command(self):
+        with socket.socket() as listener:
+            listener.settimeout(4)
+            listener.bind(("127.0.0.1", 0))
+            listener.listen()
+            port = listener.getsockname()[1]
+            with ThreadPoolExecutor(max_workers=1) as executor:
+                request = executor.submit(serve_once, listener, b"HTTP/1.1 200 Connection Established\r\n\r\n")
+                args, env = run_wrapped_command(registry_settings(False, "127.0.0.1:8888"), f"clash {port}")
+                self.assertTrue(request.result(timeout=5).startswith(b"CONNECT "))
+
+        self.assertEqual(args, ["argument with spaces", ""])
+        self.assertEqual(env["HTTP_PROXY"], f"http://127.0.0.1:{port}")
+        self.assertEqual(env["HTTPS_PROXY"], env["HTTP_PROXY"])
 
 
 if __name__ == "__main__":

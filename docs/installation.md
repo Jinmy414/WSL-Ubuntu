@@ -43,6 +43,8 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\setup\install-windows.
 
 Ubuntu 安装程序会生成本地 TLS 证书。初次设置时，请按提示创建 RDP 用户名和密码。重复安装使用已有的 RDP 凭据；若要主动重设，向 Ubuntu 安装命令传入 `--reset-rdp-credentials`。 [GNOME Remote Desktop 的单用户无头会话配置](https://github.com/GNOME/gnome-remote-desktop/blob/main/docs/configuration.md#headless-single-user)
 
+当前 `main` 源码默认从官方 GitHub 安装 Clash Verge Rev，并在本机验证下载包的 SHA-256。首次使用代理需要在 Clash 里导入自己的配置并选择节点。可加 `--skip-clash` 跳过安装，或者在 Ubuntu 内运行 `bash setup/install-clash.sh` 单独重试。 [Clash Verge Rev 官方发布](https://github.com/clash-verge-rev/clash-verge-rev/releases/tag/v2.5.10)
+
 Windows 安装程序会编译控制台，并创建桌面快捷方式与按需启动的保活任务。使用 GitHub Windows 下载包时，在第二个命令末尾加 `-UsePackagedConsole`，直接使用包内程序。首次连接时，打开 **Ubuntu-DS Console**，使用刚才创建的 RDP 凭据登录。遇到自签名证书提示时，可先查看本机证书指纹，再与远程桌面提示中的证书指纹核对。
 
 ```bash

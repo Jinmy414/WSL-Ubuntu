@@ -15,7 +15,13 @@ for path in "$XDG_RUNTIME_DIR"/wayland-*; do
 done
 
 unset WAYLAND_DISPLAY
-/usr/bin/gnome-shell --headless &
+shell_options=(--headless)
+# Stock WSLg mounts its shared X11 sockets read-only. Start this separate
+# GNOME compositor in Wayland-only mode when it cannot create Xwayland sockets.
+if [[ ! -w /tmp/.X11-unix ]]; then
+  shell_options+=(--no-x11)
+fi
+/usr/bin/gnome-shell "${shell_options[@]}" &
 shell_pid=$!
 trap 'kill "$shell_pid" 2>/dev/null || true' EXIT
 trap 'exit 0' TERM INT

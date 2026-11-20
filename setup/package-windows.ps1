@@ -41,6 +41,7 @@ $releaseFiles = @(
     'setup/ds-proxy-watch'
     'setup/ds-proxy-watch.service'
     'setup/ds-rdp-v4.service'
+    'setup/install-clash.sh'
     'setup/install-guest-desktop.sh'
     'setup/install-host-network.sh'
     'setup/install-windows.ps1'

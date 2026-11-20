@@ -3,9 +3,10 @@ set -euo pipefail
 
 usage() {
   printf '%s\n' \
-    'Usage: bash setup/install-guest-desktop.sh [--check | --reset-rdp-credentials]' \
+    'Usage: bash setup/install-guest-desktop.sh [--check] [--reset-rdp-credentials] [--skip-clash]' \
     '  --check                  Check the guest without installing or changing settings.' \
-    '  --reset-rdp-credentials  Set new RDP credentials during setup.'
+    '  --reset-rdp-credentials  Set new RDP credentials during setup.' \
+    '  --skip-clash             Skip installing the optional Clash desktop application.'
 }
 
 fail() {
@@ -48,6 +49,7 @@ preflight() {
   fi
   command -v sudo >/dev/null || fail 'The sudo command is required for installing system packages.'
   command -v ss >/dev/null || fail 'Install the iproute2 package so setup can check the local ports.'
+  command -v python3 >/dev/null || fail 'Install python3 to enable proxy-aware setup.'
   printf '  Ubuntu %s LTS on WSL 2, network mode %s.\n' "$VERSION_ID" "$network_mode"
   check_port 3391 --user gnome-remote-desktop-headless.service
   check_port 3393 --system ds-rdp-v4.service
@@ -70,16 +72,22 @@ rdp_credential_state() {
   ' <<< "$status"
 }
 
-if (( $# > 1 )); then usage >&2; exit 2; fi
-case ${1-} in
-  ''|--check|--reset-rdp-credentials) ;;
-  -h|--help) usage; exit 0 ;;
-  *) usage >&2; exit 2 ;;
-esac
+check_only=false
+reset_credentials=false
+skip_clash=false
+for argument in "$@"; do
+  case $argument in
+    --check) check_only=true ;;
+    --reset-rdp-credentials) reset_credentials=true ;;
+    --skip-clash) skip_clash=true ;;
+    -h|--help) usage; exit 0 ;;
+    *) usage >&2; exit 2 ;;
+  esac
+done
 
 echo '[1/4] Check the WSL guest and desktop ports'
 preflight
-if [[ ${1-} == --check ]]; then
+if $check_only; then
   echo 'Guest preflight passed. Run setup without --check to install the desktop.'
   exit 0
 fi
@@ -96,19 +104,24 @@ if [[ -e $tls_key && ! -f $tls_cert || -e $tls_cert && ! -f $tls_key ]]; then
 fi
 
 echo '[2/4] Install GNOME, Remote Desktop and the local relay'
-sudo apt-get update
-sudo apt-get install --yes --no-install-recommends ubuntu-session gnome-remote-desktop \
-  gnome-terminal nautilus dbus-user-session libgl1-mesa-dri openssl socat
+apt_via_windows() {
+  # Bootstrap package downloads before the guest Clash application is configured.
+  python3 "$setup_dir/ds-proxy-watch" --exec-windows \
+    sudo --preserve-env=http_proxy,https_proxy,no_proxy apt-get "$@"
+}
+apt_via_windows update
+apt_via_windows install --yes --no-install-recommends ubuntu-session gnome-remote-desktop \
+  gnome-terminal nautilus dbus-user-session libgl1-mesa-dri curl openssl socat
 
-echo '[3/4] Configure RDP and host proxy sharing'
+echo '[3/4] Configure RDP and proxy synchronization'
 credential_state=0
-if [[ ${1-} != --reset-rdp-credentials ]]; then
+if ! $reset_credentials; then
   rdp_credential_state || credential_state=$?
   if [[ $credential_state == 2 ]]; then
     fail 'Could not verify the credential state. To explicitly set new credentials, rerun with --reset-rdp-credentials.'
   fi
 fi
-if [[ ${1-} == --reset-rdp-credentials || $credential_state == 1 ]]; then
+if $reset_credentials || [[ $credential_state == 1 ]]; then
   echo 'Set an RDP username and password for Windows Remote Desktop. Use more than one character for each.'
   grdctl --headless rdp set-credentials
   rdp_credential_state || fail 'The RDP username and password must both contain more than one character. Rerun with --reset-rdp-credentials.'
@@ -165,6 +178,13 @@ grdctl --headless rdp disable-port-negotiation
 grdctl --headless rdp disable-view-only
 
 sudo bash "$setup_dir/install-host-network.sh" "$(id -un)"
+if $skip_clash; then
+  if [[ ! -e /etc/ubuntu-ds/proxy-mode ]]; then
+    sudo /usr/local/bin/ds-proxy-watch --mode windows
+  fi
+elif ! bash "$setup_dir/install-clash.sh"; then
+  echo 'Clash installation did not finish. To retry, run bash setup/install-clash.sh in Ubuntu.' >&2
+fi
 echo '[4/4] Start the desktop and RDP relay'
 systemctl --user daemon-reload
 grdctl --headless rdp enable
@@ -180,5 +200,8 @@ systemctl is-active --quiet ds-rdp-v4.service || \
 
 echo 'Guest services are running. From Windows, finish setup with setup\install-windows.ps1.'
 echo 'Open the Ubuntu-DS Console shortcut and connect to 127.0.0.1:3393 with the GNOME RDP credentials.'
+if ! $skip_clash; then
+  echo 'The guest proxy source defaults to Clash. Open Clash Verge and import your own configuration.'
+fi
 echo 'For the first Windows certificate prompt, compare the certificate fingerprint shown below.'
 openssl x509 -in "$tls_cert" -noout -fingerprint -sha1

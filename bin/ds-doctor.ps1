@@ -44,7 +44,7 @@ function Write-ProxyStatus {
         Write-Host '[代理] Windows 手动代理未开启。'
     }
     if ($settings.AutoConfigURL) {
-        Write-Host '[代理] Windows 还配置了自动代理脚本（PAC）。同步服务读取手动代理设置。'
+        Write-Host '[代理] Windows 还配置了自动代理脚本（PAC）。Windows 同步模式读取手动代理设置。'
     }
 
     try {
@@ -55,12 +55,48 @@ function Write-ProxyStatus {
             Write-Host '[代理] Ubuntu 代理同步服务未运行。检查用户会话和安装步骤。' -ForegroundColor Yellow
         }
 
+        # Earlier releases start the daemon on unknown arguments. Check support before invoking --status.
+        $statusCommand = "-d $distro --exec /bin/sh -c " +
+            '"grep -Fq -- --status /usr/local/bin/ds-proxy-watch && exec /usr/local/bin/ds-proxy-watch --status"'
+        $status = Invoke-WslCheck $statusCommand
+        $source = $null
+        $effective = $null
+        if ($status.Code -eq 0 -and $status.Text -cmatch '^mode=(windows|clash)\r?\neffective=(windows|clash|direct)$') {
+            $source = $Matches[1]
+            $effective = $Matches[2]
+            if ($source -eq 'clash') {
+                Write-Host '[代理] Ubuntu 已选择本机 Clash。'
+            } else {
+                Write-Host '[代理] Ubuntu 已选择跟随 Windows。'
+            }
+            switch ($effective) {
+                'windows' { Write-Host '[代理] Windows 手动代理可达。' -ForegroundColor Green }
+                'clash' { Write-Host '[代理] Ubuntu 本机 Clash 代理可达。' -ForegroundColor Green }
+                'direct' {
+                    if ($source -eq 'clash') {
+                        Write-Host '[代理] Ubuntu 本机 Clash 不可达，当前尝试直连。检查 Clash 是否启动及混合端口是否一致。' -ForegroundColor Yellow
+                    } elseif ($manualProxy) {
+                        Write-Host '[代理] Windows 手动代理不可用，当前尝试直连。' -ForegroundColor Yellow
+                    } else {
+                        Write-Host '[代理] 当前尝试直连。'
+                    }
+                }
+            }
+        } else {
+            Write-Host '[代理] 未能读取代理来源。若同步程序较旧，请重新运行网络同步安装。' -ForegroundColor Yellow
+        }
+
         $setting = Invoke-WslCheck "-d $distro --exec gsettings get org.gnome.system.proxy mode"
         if ($setting.Code -eq 0 -and $setting.Text -match "^'(none|manual|auto)'$") {
             $mode = $Matches[1]
             Write-Host "[代理] GNOME 代理模式 $mode。"
-            if ($manualProxy -and $mode -eq 'none') {
-                Write-Host '[代理] 当前 GNOME 使用直连。检查同步服务，以及 Ubuntu 能否访问 Windows 代理。' -ForegroundColor Yellow
+            if ($effective) {
+                $expected = if ($effective -eq 'direct') { 'none' } else { 'manual' }
+                if ($mode -ne $expected) {
+                    Write-Host '[代理] GNOME 与当前连通性探测结果不同。稍候再次检查同步状态。' -ForegroundColor Yellow
+                }
+            } elseif ($manualProxy -and $mode -eq 'none') {
+                Write-Host '[代理] GNOME 当前使用直连。检查同步服务和代理是否可达。' -ForegroundColor Yellow
             }
         } else {
             Write-Host '[代理] 无法读取 GNOME 代理模式。' -ForegroundColor Yellow

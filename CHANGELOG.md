@@ -1,5 +1,12 @@
 # 更新记录
 
+## 未发布
+
+- 默认支持 Ubuntu 内部 Clash Verge Rev，保留 Windows 系统代理模式。
+- 安装 GNOME 和 Clash 时优先利用可达的 Windows HTTP/HTTPS 系统代理。
+- 连接诊断记录所选代理来源及实际连通状态。
+- 修复全新 WSL 的 WSLg X11 套接字目录为只读时，GNOME 无法启动的问题。
+
 ## 1.0.1 首次公开版本
 
 - WPF 控制台支持嵌入 GNOME 桌面、全屏、自动重连和按需保活。

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Follow the Windows user's manual HTTP(S) proxy without restarting WSL."""
+"""Synchronize the selected Ubuntu-DS HTTP(S) proxy with apps and CLI tools."""
 
 import json
 import os
@@ -20,6 +20,8 @@ REG_EXE = (os.environ.get("DS_REG_EXE") or shutil.which("reg.exe")
            or "/mnt/c/Windows/System32/reg.exe")
 RUNTIME_DIR = Path(os.environ.get("XDG_RUNTIME_DIR", f"/run/user/{os.getuid()}"))
 ENV_FILE = RUNTIME_DIR / "ubuntu-ds-proxy.env"
+PROXY_MODE_FILE = Path("/etc/ubuntu-ds/proxy-mode")
+DEFAULT_CLASH_PORT = 7897
 LOCAL_BYPASS = ("localhost", "127.0.0.0/8", "::1", "10.0.0.0/8",
                 "172.16.0.0/12", "192.168.0.0/16", "*.local")
 PROBE_REQUEST = (b"CONNECT www.microsoft.com:443 HTTP/1.1\r\n"
@@ -81,7 +83,63 @@ def reachable(endpoint):
         return False
 
 
-def active_proxy():
+def parse_proxy_mode(arguments):
+    if arguments == ["windows"]:
+        return "windows", None
+    if arguments in (["clash"], []):
+        return "clash", DEFAULT_CLASH_PORT
+    if len(arguments) == 2 and arguments[0] == "clash" and re.fullmatch(r"[0-9]{1,5}", arguments[1]):
+        port = int(arguments[1])
+        if 1 <= port <= 65535:
+            return "clash", port
+    raise ValueError("Expected 'windows' or 'clash [PORT]' with a TCP port from 1 to 65535.")
+
+
+def read_proxy_mode():
+    try:
+        return parse_proxy_mode(PROXY_MODE_FILE.read_text(encoding="ascii").split())
+    except FileNotFoundError:
+        return "clash", DEFAULT_CLASH_PORT
+
+
+def set_proxy_mode(arguments):
+    if not arguments:
+        raise ValueError("Specify 'windows' or 'clash [PORT]'.")
+    mode, port = parse_proxy_mode(arguments)
+    if os.geteuid() != 0:
+        raise PermissionError("Use sudo to change the Ubuntu-DS proxy mode.")
+    PROXY_MODE_FILE.parent.mkdir(mode=0o755, parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(mode="w", encoding="ascii", dir=PROXY_MODE_FILE.parent, delete=False) as file:
+        pending = Path(file.name)
+        file.write(f"clash {port}\n" if mode == "clash" else "windows\n")
+    try:
+        pending.chmod(0o644)
+        pending.replace(PROXY_MODE_FILE)
+    finally:
+        pending.unlink(missing_ok=True)
+    print(f"Ubuntu-DS proxy mode: {mode}")
+
+
+def guest_listener(port):
+    # Consomme can reach a Windows loopback socket. Require a Linux listener before
+    # accepting a same-numbered port as the proxy running inside this guest.
+    port_hex = f"{port:04X}"
+    with open("/proc/net/tcp", encoding="ascii") as table:
+        next(table, None)
+        for row in table:
+            fields = row.split()
+            if len(fields) > 3 and fields[3] == "0A" and fields[1] in (
+                    f"0100007F:{port_hex}", f"00000000:{port_hex}"):
+                return True
+    return False
+
+
+def active_proxy(preference=None):
+    mode, port = preference if preference is not None else read_proxy_mode()
+    if mode == "clash":
+        endpoint = ("127.0.0.1", port)
+        active = {"http": endpoint, "https": endpoint} if guest_listener(port) and reachable(endpoint) else {}
+        return active, LOCAL_BYPASS, True
     configured, bypass = windows_settings()
     availability = {endpoint: reachable(endpoint) for endpoint in set(configured.values())}
     active = {scheme: endpoint for scheme, endpoint in configured.items()
@@ -101,15 +159,15 @@ def proxy_env(endpoints, bypass):
     return env
 
 
-def exec_with_proxy(command):
+def exec_with_proxy(command, preference=None):
     if not command:
         print("Usage: ds-proxy-watch --exec COMMAND [ARGUMENTS...]", file=sys.stderr)
         return 2
     env = os.environ.copy()
     try:
-        endpoints, bypass, _ = active_proxy()
-    except (OSError, subprocess.SubprocessError) as error:
-        print(f"Unable to read Windows proxy settings: {error}", file=sys.stderr)
+        endpoints, bypass, _ = active_proxy(preference)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        print("Unable to read the selected Ubuntu-DS proxy settings.", file=sys.stderr)
     else:
         for key in PROXY_KEYS:
             env.pop(key, None)
@@ -160,25 +218,46 @@ def main():
     failed = False
     while True:
         try:
-            active, bypass, configured = active_proxy()
-            current = active, bypass
+            preference = read_proxy_mode()
+            mode = preference[0]
+            active, bypass, configured = active_proxy(preference)
+            current = mode, active, bypass
             if state != current:
-                apply(*current)
+                apply(active, bypass)
                 state = current
                 if active:
-                    print("Windows HTTP(S) proxy:", active, flush=True)
+                    print(f"Proxy active: {mode}", flush=True)
                 else:
-                    detail = "configured proxy unavailable" if configured else "manual proxy disabled"
-                    print(f"Direct via Windows network ({detail})", flush=True)
+                    detail = f"{mode} proxy unavailable" if configured else "Windows manual proxy disabled"
+                    print(f"Direct via WSL ({detail})", flush=True)
             failed = False
-        except (OSError, subprocess.SubprocessError) as error:
+        except (OSError, ValueError, subprocess.SubprocessError) as error:
             if not failed:
-                print(f"Unable to update Windows proxy: {error}", flush=True)
+                print(f"Unable to update Ubuntu-DS proxy ({type(error).__name__}).", flush=True)
             failed = True
         time.sleep(5)
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1 and sys.argv[1] == "--exec":
-        sys.exit(exec_with_proxy(sys.argv[2:]))
-    main()
+    arguments = sys.argv[1:]
+    try:
+        if not arguments:
+            main()
+        elif arguments[0] == "--exec":
+            sys.exit(exec_with_proxy(arguments[1:]))
+        elif arguments[0] == "--exec-windows":
+            sys.exit(exec_with_proxy(arguments[1:], ("windows", None)))
+        elif arguments == ["--status"]:
+            preference = read_proxy_mode()
+            active, _, _ = active_proxy(preference)
+            mode = preference[0]
+            print(f"mode={mode}\neffective={mode if active else 'direct'}")
+        elif arguments[0] == "--mode":
+            set_proxy_mode(arguments[1:])
+        else:
+            print("Usage: ds-proxy-watch [--status | --mode windows | --mode clash [PORT] | --exec COMMAND | --exec-windows COMMAND]",
+                  file=sys.stderr)
+            sys.exit(2)
+    except (OSError, ValueError, subprocess.SubprocessError):
+        print("Could not read or update the Ubuntu-DS proxy settings. Check the mode and permissions.", file=sys.stderr)
+        sys.exit(1)

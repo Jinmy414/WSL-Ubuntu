@@ -4,6 +4,22 @@
 
 在[发布页](https://github.com/Jinmy414/WSL-Ubuntu/releases)下载文件名以 `-windows.zip` 结尾的附件及对应的 `.sha256` 文件，放在同一目录。如需源码，可从 [v1.0.1 版本标签](https://github.com/Jinmy414/WSL-Ubuntu/tree/v1.0.1) 获取。v1.2.1 发布页上的 Source code 归档只有发行文档及仓库配置。解压前，可用 `Get-FileHash -Algorithm SHA256 <ZIP 文件路径>` 计算校验值，并与 `.sha256` 文件第一列核对。
 
+## 陶橙桌面与 ChatGPT
+
+安装器中的「陶橙桌面外观」会保存当前用户的外观设置，然后应用壁纸、左侧 Dock 和原生动效。首次新建 Ubuntu-DS 时默认勾选。升级已有工作站时可以自行选择。手动配置时，在解压目录中运行以下命令。
+
+```bash
+bash setup/install-components.sh clay
+```
+
+如需恢复之前的外观，运行以下命令。此后手动调整过的设置会保留。
+
+```bash
+/usr/bin/python3 setup/clay-desktop.py --restore
+```
+
+「ChatGPT 桌面端」在 Ubuntu 应用菜单中显示为 **ChatGPT**，使用者自行登录。首次下载约 500 MB，已安装客户端时直接复用。安装 Codex 命令行工具请另行勾选 **OpenAI Codex CLI**。
+
 ## 安装发行版
 
 ```powershell

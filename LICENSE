@@ -1,21 +1,9 @@
-MIT License
+# WSL-Ubuntu 发行许可
 
-Copyright (c) 2026 WSL-Ubuntu contributors
+自 v1.2.1 起，本许可适用于 WSL-Ubuntu 权利人随官方发行版提供、且有权按本条款授权的新增专有部分。权利人允许个人和组织免费在自己的设备上下载、安装、运行和备份官方发行版，用于个人或工作用途。可以分享官方下载链接。
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+在适用法律允许的范围内，修改或基于上述专有部分制作、分发衍生版本，需要事先取得权利人的书面许可。本授权不限制用户配置自己的 Ubuntu 环境、开发和运行自己的应用、备份或迁移自己的数据。
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+v1.2.0 及此前已按 MIT 许可发布的代码，包括新版中沿用的这些代码，继续适用随附的 LEGACY-MIT.txt。第三方组件分别适用各自的许可。使用这些部分时，用户保有原许可及适用法律赋予的权利。
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+在适用法律允许的范围内，专有部分按现状提供，不附带适销性、特定用途适用性等保证。

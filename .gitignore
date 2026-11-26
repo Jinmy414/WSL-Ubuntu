@@ -20,6 +20,7 @@
 *.log
 *.dmp
 *.png
+!/docs/ubuntu-ds-console.png
 *.jpg
 *.jpeg
 *.bmp
@@ -40,3 +41,11 @@ __pycache__/
 *.pfx
 *.rdg
 /bin/ds-user.txt
+
+# Public distribution repository. Build and edit the application in WSL-Ubuntu-Core.
+/bin/
+/setup/
+/tests/
+*.cs
+*.csproj
+*.xaml

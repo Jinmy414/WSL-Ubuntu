@@ -1,9 +1,0 @@
-# Merge these keys into %UserProfile%\.wslconfig on Windows.
-# Use a WSL release that supports the Consomme networking mode.
-[wsl2]
-networkingMode=consomme
-localhostForwarding=true
-dnsTunneling=true
-
-# The Ubuntu-DS watcher handles live changes to the Windows manual HTTP(S) proxy.
-autoProxy=false

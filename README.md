@@ -1,39 +1,47 @@
 # WSL-Ubuntu
 
-在 Windows 上打开完整的 Ubuntu GNOME 桌面。WSL-Ubuntu 使用 WSL 2 运行独立的 GNOME 会话，并在 WPF 控制台内嵌 Windows 远程桌面。
+在 Windows 11 的一个窗口里使用完整的 Ubuntu GNOME 桌面。打开 Ubuntu-DS 控制台即可启动 WSL 2 会话，连接后可以直接操作 Linux 应用，在窗口底部查看内存、CPU 和运行时间。
 
-- **桌面连接**　启动后确认 RDP 握手，再打开桌面。支持断线重连、全屏和本机备份。
-- **宿主机代理同步**　GNOME、Bash 和项目命令入口跟随 Windows 当前的手动 HTTP/HTTPS 系统代理。
-- **本地安装**　安装者创建自己的 Linux 用户和 RDP 凭据，TLS 证书在本机生成。
+[下载 Windows 安装器 · v1.2.1](https://github.com/Jinmy414/WSL-Ubuntu/releases/download/v1.2.1/WSL-Ubuntu-1.2.1-Setup.exe) · [下载 ZIP](https://github.com/Jinmy414/WSL-Ubuntu/releases/download/v1.2.1/WSL-Ubuntu-1.2.1-windows.zip) · [安装指南](docs/installation.md) · [连接排查](docs/troubleshooting.md) · [工作原理](docs/architecture.md)
 
-## 开始使用
+![Ubuntu-DS 控制台内的 GNOME 桌面，上方为连接和备份工具栏，下方显示 RDP 与资源状态](docs/ubuntu-ds-console.png)
 
-需要 Windows 11、WSL 2 和 Ubuntu 26.04 LTS。可以从仓库的 Releases 下载 Windows ZIP，也可以克隆源码。按文档完成发行版安装和两端预检，再打开桌面上的 **Ubuntu-DS Console**。 [安装指南](docs/installation.md)
+*本机定制工作站实拍。桌面应用和壁纸由用户配置，公开版工具栏中的终端入口标为「终端」。*
+
+## 使用安装器
+
+运行 **WSL-Ubuntu-1.2.1-Setup.exe**，按向导选择安装位置和附加功能。
+
+1. **安装位置**　选择 Windows 控制台目录。首次创建 Ubuntu-DS 时，还可以指定一个空目录存放虚拟磁盘。已注册的 Ubuntu-DS 会显示当前磁盘位置并直接复用。
+2. **附加功能**　CC Switch、ChatGPT 网页入口、OpenAI Codex CLI 和 Clash Verge Rev 可分别勾选，也可全部取消。选中的缺失组件在 Ubuntu 中安装，已有组件会复用。ChatGPT 入口打开官网，Codex CLI 首次使用时需要自行登录。
+3. **安装进度**　进度条显示已完成的步骤，展开「查看详细信息」可查看检查清单与错误信息。遇到 Windows 重启提示时，重新登录后再次打开安装器。
+4. **打开桌面**　使用自己在 GNOME 配置时设置的 RDP 凭据登录。以后可通过桌面上的 **Ubuntu-DS Console** 快捷方式连接。
+
+首次创建 Linux 用户时请自行设置密码。安装软件出现 `sudo` 提示时输入这个 Linux 用户的密码，终端输入时不显示字符。安装包、SHA-256 和版本说明见 [v1.2.1 发布页](https://github.com/Jinmy414/WSL-Ubuntu/releases/tag/v1.2.1)。
+
+## 使用 ZIP 手动安装
+
+1. 下载并解压 Windows ZIP，在包含 `bin` 和 `setup` 的目录中打开 PowerShell，按[安装指南](docs/installation.md)准备专用的 Ubuntu 26.04 LTS 发行版，完成预检并安装。ZIP 已包含编译好的 Windows 控制台。
+2. 配置本机 RDP 登录凭据后，打开桌面上的 **Ubuntu-DS Console**。控制台会等待 GNOME 和 RDP 中继就绪，再连接桌面。
+3. 首次连接使用上一步创建的凭据登录。遇到连接问题，从「帮助 → 运行连接诊断」查看网络、GNOME 服务和 RDP 握手分别进行到了哪一步。
+
+## 日常操作
 
 | 操作 | 入口 |
 | --- | --- |
 | 开机并连接 | 桌面快捷方式 **Ubuntu-DS Console** |
 | 独立远程桌面 | `bin\ds-desktop.cmd` |
 | 打开终端 | 控制台工具栏或 `bin\ds.cmd` |
-| 使用 Windows 当前代理执行命令 | `bin\ds.cmd <命令>` 或 `bin\ds-root.cmd <命令>` |
+| 使用当前代理执行命令 | `bin\ds.cmd <命令>` 或 `bin\ds-root.cmd <命令>` |
 | 诊断连接 | 控制台「帮助 → 运行连接诊断」或 `bin\ds-doctor.cmd` |
 | 备份或关机 | 控制台「备份」「关机」 |
 
-构建、打包和本机排查分别见[构建说明](BUILDING.md)与[排查指南](docs/troubleshooting.md)。
+## 下载与许可
 
-## 仓库结构
+需要查看或修改源码时，请使用 [v1.0.1 源码版](https://github.com/Jinmy414/WSL-Ubuntu/tree/v1.0.1)。这是官方保留的唯一源码发行版。新版控制台和安装向导在私有仓库构建，用户可免费下载 Windows 安装器或 ZIP。此前已按 MIT 发布的代码继续适用[原有许可](LEGACY-MIT.txt)，新版新增专有部分的授权见[使用许可](LICENSE)。
 
-| 位置 | 内容 |
-| --- | --- |
-| `bin/` | Windows 启动、诊断和备份入口，及 RDP 模板 |
-| `setup/` | WPF 控制台源码、构建脚本和 Windows／Ubuntu 安装程序 |
-| `docs/` | 安装、排查和工作原理 |
-| `tests/` | 代理和连接行为测试 |
-| `.github/` | 构建验证、发布工作流和贡献模板 |
-
-安装引导和文档组织参考了 [Fedora Remix for WSL](https://github.com/WhitewaterFoundry/Fedora-Remix-for-WSL)。查看[工作原理](docs/architecture.md)、[贡献指南](CONTRIBUTING.md)、[更新记录](CHANGELOG.md)或 [MIT 许可证](LICENSE)。
+安装引导和文档组织参考了 [Fedora Remix for WSL](https://github.com/WhitewaterFoundry/Fedora-Remix-for-WSL)。使用中遇到问题，可查看[连接排查](docs/troubleshooting.md)或在[公开仓库反馈](https://github.com/Jinmy414/WSL-Ubuntu/issues)。历史版本的变更见[更新记录](CHANGELOG.md)。
 
 ## 联系
 
-- 微信号 `18611567539`
-- 邮箱 <1792267909@qq.com>
+邮箱 <1792267909@qq.com>

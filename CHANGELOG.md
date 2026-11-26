@@ -1,5 +1,10 @@
 # 更新记录
 
+## 2.1.0
+
+- 在控制台「帮助 → GPU / CUDA 环境检查」中查看 NVIDIA GPU 型号和驱动、CUDA 工具链版本，以及所选 Ubuntu Python 环境的 PyTorch GPU 张量运算结果。
+- 支持系统 Python、venv 和 Conda 解释器。各项独立执行，缺少 nvcc 或 PyTorch 时依然可查看其他结果。在 Ubuntu 终端运行 `bin/ds-gpu.py` 也可输出文本或 JSON。
+
 ## 2.0.0
 
 - 陶橙折带图标取代旧控制台图标。工具栏保留连接、终端和全屏，重启、备份和关机集中在「虚拟机」菜单。

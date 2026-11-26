@@ -2,7 +2,7 @@
 
 在 Windows 11 的一个窗口里使用完整的 Ubuntu GNOME 桌面。打开 Ubuntu-DS 控制台即可启动 WSL 2 会话，连接后可以直接操作 Linux 应用，在窗口底部查看内存、CPU 和运行时间。
 
-[下载 Windows 安装器 · v2.0.0](https://github.com/Jinmy414/WSL-Ubuntu/releases/download/v2.0.0/WSL-Ubuntu-2.0.0-Setup.exe) · [下载 ZIP](https://github.com/Jinmy414/WSL-Ubuntu/releases/download/v2.0.0/WSL-Ubuntu-2.0.0-windows.zip) · [安装指南](docs/installation.md) · [连接排查](docs/troubleshooting.md) · [工作原理](docs/architecture.md)
+[下载 Windows 安装器 · v2.1.0](https://github.com/Jinmy414/WSL-Ubuntu/releases/download/v2.1.0/WSL-Ubuntu-2.1.0-Setup.exe) · [下载 ZIP](https://github.com/Jinmy414/WSL-Ubuntu/releases/download/v2.1.0/WSL-Ubuntu-2.1.0-windows.zip) · [安装指南](docs/installation.md) · [连接排查](docs/troubleshooting.md) · [工作原理](docs/architecture.md)
 
 ![Ubuntu-DS 控制台内的 GNOME 桌面，上方为工作站工具栏，下方显示 RDP 与资源状态](docs/ubuntu-ds-console.png)
 
@@ -10,7 +10,7 @@
 
 ## 使用安装器
 
-运行 **WSL-Ubuntu-2.0.0-Setup.exe**，按向导选择安装位置和附加功能。
+运行 **WSL-Ubuntu-2.1.0-Setup.exe**，按向导选择安装位置和附加功能。
 
 <details><summary>查看安装向导实拍（五个页面和展开后的进度详情）</summary>
 
@@ -23,7 +23,7 @@
 3. **安装进度**　进度条显示已完成的步骤，展开「查看详细信息」可查看检查清单与错误信息。遇到 Windows 重启提示时，重新登录后再次打开安装器。
 4. **打开桌面**　使用自己在 GNOME 配置时设置的 RDP 凭据登录。以后可通过桌面上的 **Ubuntu-DS Console** 快捷方式连接。
 
-首次创建 Linux 用户时请自行设置密码。安装软件出现 `sudo` 提示时输入这个 Linux 用户的密码，终端输入时不显示字符。安装包、SHA-256 和版本说明见 [v2.0.0 发布页](https://github.com/Jinmy414/WSL-Ubuntu/releases/tag/v2.0.0)。
+首次创建 Linux 用户时请自行设置密码。安装软件出现 `sudo` 提示时输入这个 Linux 用户的密码，终端输入时不显示字符。安装包、SHA-256 和版本说明见 [v2.1.0 发布页](https://github.com/Jinmy414/WSL-Ubuntu/releases/tag/v2.1.0)。
 
 ## 使用 ZIP 手动安装
 
@@ -39,6 +39,7 @@
 | 独立远程桌面 | `bin\ds-desktop.cmd` |
 | 打开终端 | 控制台工具栏或 `bin\ds.cmd` |
 | 使用当前代理执行命令 | `bin\ds.cmd <命令>` 或 `bin\ds-root.cmd <命令>` |
+| 检查 GPU、CUDA 和 PyTorch | 控制台「帮助 → GPU / CUDA 环境检查」，可指定项目的 Ubuntu Python 路径。 |
 | 诊断连接 | 控制台「帮助 → 运行连接诊断」或 `bin\ds-doctor.cmd` |
 | 备份或关机 | 控制台「虚拟机」菜单里的「备份」或「关机」 |
 

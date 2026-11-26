@@ -41,3 +41,23 @@ sudo /usr/local/bin/ds-proxy-watch --mode windows
 ## 提交问题
 
 附上出错步骤、Windows 和 WSL 版本、Ubuntu 版本，以及 `ds-doctor` 的相关结果。先删除日志中的真实用户名、主机路径、局域网地址、代理凭据及桌面截图里的私人内容。
+
+
+## GPU / CUDA 环境检查
+
+打开控制台「帮助 → GPU / CUDA 环境检查」，点「开始检查」。输入框留空时检查 Ubuntu 的系统 Python。若使用 venv 或 Conda，在已激活的项目终端运行 `python -c "import sys; print(sys.executable)"`，将输出的完整 Linux 路径粘贴到输入框，再点「重新检查」。
+
+| 检查项 | 读法 |
+| --- | --- |
+| NVIDIA GPU | 列出 Ubuntu 中 nvidia-smi 实际识别的显卡及驱动版本。 |
+| CUDA 工具链 | 显示 nvcc 路径和版本。缺少编译器时，下面的 PyTorch 检查仍会执行。 |
+| PyTorch GPU 运算 | 显示解释器、PyTorch 版本及其构建使用的 CUDA 版本。在当前 CUDA 设备上计算 1² + 2² + 3²，同步并读回结果 14 后显示「通过」。 |
+
+在解压目录的 Ubuntu 终端中也可执行以下命令。第一条使用当前激活的 Python，第二条适合脚本读取。
+
+```bash
+python3 bin/ds-gpu.py
+python3 bin/ds-gpu.py --python "/path/to/project/.venv/bin/python" --json
+```
+
+全部通过时返回 0，有任何一项未通过时返回 1。检查过程中无需 sudo，也不会安装驱动、CUDA 或 Python 包。
